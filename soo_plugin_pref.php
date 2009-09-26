@@ -1,7 +1,7 @@
 <?php
 
 $plugin['name'] = 'soo_plugin_pref';
-$plugin['version'] = '0.2';
+$plugin['version'] = '0.2.1';
 $plugin['author'] = 'Jeff Soo';
 $plugin['author_uri'] = 'http://ipsedixit.net/txp/';
 $plugin['description'] = 'Plugin preference manager';
@@ -13,18 +13,27 @@ if (!defined('txpinterface'))
 
 # --- BEGIN PLUGIN CODE ---
 
+// event handler called by other plugins on plugin_lifecycle and plugin_prefs events
 function soo_plugin_pref( $event, $step, $defaults ) {
 	preg_match('/^(.+)\.(.+)/', $event, $match);
-	list($event, $type, $plugin) = $match;
+	list( , $type, $plugin) = $match;
 	$message = $step ? soo_plugin_pref_query($plugin, $step, $defaults): '';
 	if ( $type == 'plugin_prefs' )
 		soo_plugin_pref_ui($plugin, $defaults, $message);
 }
 
+// user interface for preference setting (plugin_prefs events)
 function soo_plugin_pref_ui( $plugin, $defaults, $message = '' ) {
 	$cols = 2;
 	$align_rm = ' style="text-align:right;vertical-align:middle"';
 	$prefs = soo_plugin_pref_query($plugin, 'select');
+	
+	// install prefs if necessary
+	if ( $defaults and ! $prefs ) {
+		soo_plugin_pref_query($plugin, 'enabled', $defaults);
+		$prefs = soo_plugin_pref_query($plugin, 'select');
+	}
+	
 	pagetop(gTxt('edit_preferences') . " &#8250; $plugin", $message);
 	echo
 		n. '<form method="post" name="soo_plugin_pref_form">' .
@@ -61,13 +70,14 @@ function soo_plugin_pref_ui( $plugin, $defaults, $message = '' ) {
 		n;
 }
 
+// preference CRUD
 function soo_plugin_pref_query( $plugin, $action, $defaults = array() ) {
 
 	if ( $action == 'select' )
 		return safe_rows(
-			'name, val, html',
-			'txp_prefs',
-			"name like '$plugin.%'"
+			'name, val, html, position', 
+			'txp_prefs', 
+			"name like '$plugin.%' order by position asc"
 		);
 
 	elseif ( $action == 'update' ) {
@@ -79,8 +89,8 @@ function soo_plugin_pref_query( $plugin, $action, $defaults = array() ) {
 					$error = true;
 		return empty($error) ? gTxt('preferences_saved') : '';
 	}
-
-	elseif ( $action == 'installed' ) {
+	
+	elseif ( $action == 'enabled' ) {
 		$prefs = soo_plugin_pref_vals($plugin);
 		$add = array_diff_key($defaults, $prefs);
 		$remove = array_diff_key($prefs, $defaults);
@@ -94,12 +104,21 @@ function soo_plugin_pref_query( $plugin, $action, $defaults = array() ) {
 			);
 		foreach ( $remove as $name => $val )
 			safe_delete('txp_prefs', "name = '$plugin.$name'");
+		
+		// check position values; correct if necessary
+		$rs = soo_plugin_pref_query($plugin, 'select');
+		foreach ( $rs as $i => $r )
+			if ( $i != $r['position'] )
+				safe_update('txp_prefs', 
+				"position = $i", 
+				"name = '" . $r['name'] . "'");
 	}
 
 	elseif ( $action == 'deleted' )
 		safe_delete('txp_prefs', "name like '$plugin.%'");
 }
 
+// get a plugin's prefs; return as associative name:value array
 function soo_plugin_pref_vals( $plugin ) {
 	$rs = soo_plugin_pref_query($plugin, 'select');
 	foreach ( $rs as $r ) {
@@ -171,7 +190,9 @@ It uses the plugin prefs/lifecycle features introduced in Txp 4.2.0, so %(requir
 
 h2(#usage). Usage
 
-*soo_plugin_pref* only works with plugins that are designed to use it. "Install and activate":http://textbook.textpattern.net/wiki/index.php?title=Plugins#Downloading_.26_installing_plugins *soo_plugin_pref* before installing any *soo_plugin_pref*-compatible plugins. Once activated, each such plugin will have an "Options" link in the *Manage* column (far right) on the "Plugins page":http://textbook.textpattern.net/wiki/index.php?title=Plugins. Click that link to set the plugin's preferences. (Note that this "Options" link is a core Txp feature, not restricted to plugins compatible with *soo_plugin_pref*.)
+*soo_plugin_pref* only works with plugins that are designed to use it. (See "support forum thread":http://forum.textpattern.com/viewtopic.php?id=31732 for a list of compatible plugins.) As of version 0.2.1, you can install plugins in any order. A compatible plugin's preferences will be installed the first time you "activate it or click its *Options* link in the plugin list":http://textbook.textpattern.net/wiki/index.php?title=Plugins#Panel_layout_.26_controls while *soo_plugin_pref* is active. Its preferences will be removed from the database when you delete it while *soo_plugin_pref* is active.
+
+To set a plugin's preferences, "click its *Options* link in the plugin list":http://textbook.textpattern.net/wiki/index.php?title=Plugins#Panel_layout_.26_controls.
 
 h2(#authors). Info for plugin authors
 
@@ -221,11 +242,12 @@ For each preference, @val@ is the default value, and @html@ is the type of HTML 
 
 Preference names in the database are in the format "plugin_name.key", where "plugin_name" is your plugin's name, and "key" is the array key from the @$defaults@ array.
 
+Each preference will be assigned a position value corresponding to its position in the defaults array, starting at 0. This determines its relative order in the admin interface.
+
 Other @txp_prefs@ columns are set as follows:
 * @event@ is always set to "plugin_prefs"
 * @prefs_id@ is always set to @1@
 * @type@ is always set to @2@ (hidden from main Prefs page)
-* @position@ is always set to @0@
 
 h4. Alternative configuration if prefs are optional
 
@@ -268,7 +290,7 @@ pre. function abc_my_plugin_prefs( $event, $step ) {
 	if ( function_exists('soo_plugin_pref') )
 		return soo_plugin_pref($event, $step, abc_my_plugin_defaults());
 	if ( substr($event, 0, 12) == 'plugin_prefs' ) {
-		$plugin = substr($event, 12);
+		$plugin = substr($event, 13);
 		$message = '<p><br /><strong>' . gTxt('edit') . " $plugin " .
 			gTxt('edit_preferences') . ':</strong><br />' . 
 			gTxt('install_plugin') . ' <a
@@ -276,8 +298,6 @@ pre. function abc_my_plugin_prefs( $event, $step ) {
 		pagetop(gTxt('edit_preferences') . " &#8250; $plugin", $message);
 	}
 }
-
-Remind your users that *soo_plugin_pref* has to be installed and active before any dependent plugins are installed. If a user has installed your plugin first, they will have to reinstall it after installing *soo_plugin_pref*. 
 
 h3(#functions). Functions
 
@@ -295,9 +315,14 @@ where @$abc_my_plugin@ is global.
 h3(#limitations). Limitations
 
 * Currently the only allowed values for @html@ are @text_input@ and @yesnoradio@.
-* *soo_plugin_pref* only handles global preferences. If your plugin has a mix of global and per-user preferences, you will have to code all the handling of the per-user preferences, including deleting them when the plugin is deleted.
+* *soo_plugin_pref* only handles global preferences. If your plugin has a mix of global and per-user preferences, you will have to code all the handling of the per-user preferences.
 
 h2(#history). Version History
+
+h3. 0.2.1 (9/26/2009)
+
+* Pre-installing *soo_plugin_pref* is no longer required for automatic preference installation
+* Each preference is now assigned a position value that determines relative order in the admin interface, and that corresponds to its position in the defaults array
 
 h3. 0.2 (9/17/2009)
 
