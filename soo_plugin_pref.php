@@ -1,7 +1,7 @@
 <?php
 
 $plugin['name'] = 'soo_plugin_pref';
-$plugin['version'] = '0.2.1';
+$plugin['version'] = '0.2.2';
 $plugin['author'] = 'Jeff Soo';
 $plugin['author_uri'] = 'http://ipsedixit.net/txp/';
 $plugin['description'] = 'Plugin preference manager';
@@ -105,13 +105,11 @@ function soo_plugin_pref_query( $plugin, $action, $defaults = array() ) {
 		foreach ( $remove as $name => $val )
 			safe_delete('txp_prefs', "name = '$plugin.$name'");
 		
-		// check position values; correct if necessary
-		$rs = soo_plugin_pref_query($plugin, 'select');
-		foreach ( $rs as $i => $r )
-			if ( $i != $r['position'] )
-				safe_update('txp_prefs', 
+		// update position values
+		foreach ( array_keys($defaults) as $i => $name )
+			safe_update('txp_prefs', 
 				"position = $i", 
-				"name = '" . $r['name'] . "'");
+				"name = '$plugin.$name'");
 	}
 
 	elseif ( $action == 'deleted' )
@@ -318,6 +316,10 @@ h3(#limitations). Limitations
 * *soo_plugin_pref* only handles global preferences. If your plugin has a mix of global and per-user preferences, you will have to code all the handling of the per-user preferences.
 
 h2(#history). Version History
+
+h3. 0.2.2 (9/28/2009)
+
+Fixed bug in pref position re-indexing
 
 h3. 0.2.1 (9/26/2009)
 
