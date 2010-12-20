@@ -304,8 +304,8 @@ There's also @soo_plugin_pref_vals( $plugin )@, a handy little function that ret
 pre. if ( function_exists('soo_plugin_pref_vals') )
 	$abc_my_plugin = soo_plugin_pref_vals('abc_my_plugin');
 else 
-	foreach ( abc_my_plugin_defaults() as $name => $val )
-		$abc_my_plugin[$name] = $val;
+	foreach ( abc_my_plugin_defaults() as $name => $atts )
+		$abc_my_plugin[$name] = $atts['val'];
 
 
 where @$abc_my_plugin@ is global.
