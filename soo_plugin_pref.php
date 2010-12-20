@@ -200,27 +200,25 @@ h3(#config). Configuration
 
 To configure a plugin to work with *soo_plugin_pref*: 
 
-If this is a public-side plugin, set the type so that it will also load on the admin side:
+In the plugin manifest (i.e., the @$plugin@ array at the top of the file):
 
-pre. $plugin['type'] = 1; 
+* Ensure the plugin will load on the admin side (i.e., if @type@ is 0, change it to 1)
+* Set the plugin flags (using "http://textpattern.googlecode.com/svn/development/4.x-plugin-template/":http://textpattern.googlecode.com/svn/development/4.x-plugin-template/ all you need to do is uncomment the @$plugin['flags']@ line):
 
-Set the plugin flags at the top of the plugin template (using the "http://textpattern.googlecode.com/svn/development/4.x-plugin-template/":http://textpattern.googlecode.com/svn/development/4.x-plugin-template/ template all you need to do is uncomment the @$plugin['flags']@ line):
+In the plugin code section (substituting your plugin's name for @abc_my_plugin@, and whatever name you choose for the callback function):
 
-pre. if (!defined('PLUGIN_HAS_PREFS')) define('PLUGIN_HAS_PREFS', 0x0001); 
-if (!defined('PLUGIN_LIFECYCLE_NOTIFY')) define('PLUGIN_LIFECYCLE_NOTIFY', 0x0002); 
-$plugin['flags'] = PLUGIN_HAS_PREFS | PLUGIN_LIFECYCLE_NOTIFY;
+pre. @require_plugin('soo_plugin_pref');	// optional
+if ( @txpinterface == 'admin' ) 
+{
+	add_privs('plugin_prefs.abc_my_plugin','1,2');
+	add_privs('plugin_lifecycle.abc_my_plugin','1,2');
+	register_callback('abc_my_plugin_prefs', 'plugin_prefs.abc_my_plugin');
+	register_callback('abc_my_plugin_prefs', 'plugin_lifecycle.abc_my_plugin');
+}
 
-Then somewhere in the plugin code section (substituting your plugin's name for @abc_my_plugin@, and whatever name you choose for the callback function):
+Define your plugin's preference defaults. I like to do this with a function, with the option to output the multi-level array required by @soo_plugin_pref()@ or a simple key:value array:
 
-pre. require_plugin('soo_plugin_pref');
-add_privs('plugin_prefs.abc_my_plugin','1,2');
-add_privs('plugin_lifecycle.abc_my_plugin','1,2');
-register_callback('abc_my_plugin_prefs', 'plugin_prefs.abc_my_plugin');
-register_callback('abc_my_plugin_prefs', 'plugin_lifecycle.abc_my_plugin');
-
-and finally, define your plugin's preferences and route the @plugin_prefs@ and @plugin_lifecycle@ events to @soo_plugin_pref()@ in your callback function. Here's an example:
-
-pre. function abc_my_plugin_prefs( $event, $step ) {
+pre. function abc_my_plugin_defaults( $vals_only = false ) {
 	$defaults = array(
 		'foo' => array(
 			'val'	=> 'foo',
@@ -233,7 +231,10 @@ pre. function abc_my_plugin_prefs( $event, $step ) {
 			'text'	=> 'Equally helpful description',
 		),
 	);
-	soo_plugin_pref($event, $step, $defaults);
+	if ( $vals_only )
+		foreach ( $defaults as $name => $arr )
+			$defaults[$name] = $arr['val'];
+	return $defaults;
 }
 
 For each preference, @val@ is the default value, and @html@ is the type of HTML input element used to display the preference in the admin interface; these go to the corresponding columns in @txp_prefs@. @text@ is the label that will appear in the admin interface; it is not stored in the database.
@@ -247,32 +248,7 @@ Other @txp_prefs@ columns are set as follows:
 * @prefs_id@ is always set to @1@
 * @type@ is always set to @2@ (hidden from main Prefs page)
 
-h4. Alternative configuration if prefs are optional
-
-If you wish to offer *soo_plugin_pref* preference management as an option rather than a requirement:
-
-Set the plugin flags as above.
-
-Prefix the error suppression operator ('@') to the @require_plugin()@ line, but otherwise set @add_privs()@ and @register_callback()@ as above.
-
-Define your preference defaults in a separate function:
-
-pre. function abc_my_plugin_defaults( ) {
-	return array(
-		'foo' => array(
-			'val'	=> 'foo',
-			'html'	=> 'text_input',
-			'text'	=> 'Helpful description',
-		),
-		'bar' => array(
-			'val'	=> 1,
-			'html'	=> 'yesnoradio',
-			'text'	=> 'Equally helpful description',
-		),
-	);
-}
-
-Then add a conditional check to your callback function:
+Add the prefs callback:
 
 pre. function abc_my_plugin_prefs( $event, $step ) {
 	if ( function_exists('soo_plugin_pref') )
@@ -297,18 +273,20 @@ pre. function abc_my_plugin_prefs( $event, $step ) {
 	}
 }
 
-h3(#functions). Functions
+Finally, fetch the plugin preferences for use by the rest of the plugin code. I usually put preferences into a global array:
 
-There's also @soo_plugin_pref_vals( $plugin )@, a handy little function that returns your plugin's preferences as an associative array. It strips the plugin name and '.' from the name in the database, so that the array keys match those in your defaults array. My typical use of this, with the alternative (i.e., *soo_plugin_pref* optional) configuration shown above:
+pre. global $abc_my_plugin;
+$abc_my_plugin = function_exists('soo_plugin_pref_vals') ? 
+	array_merge(abc_my_plugin_defaults(true), soo_plugin_pref_vals('abc_my_plugin')) 
+	: abc_my_plugin_defaults(true);
 
-pre. if ( function_exists('soo_plugin_pref_vals') )
-	$abc_my_plugin = soo_plugin_pref_vals('abc_my_plugin');
-else 
-	foreach ( abc_my_plugin_defaults() as $name => $atts )
-		$abc_my_plugin[$name] = $atts['val'];
+Note the use of @soo_plugin_pref_vals()@, which returns your plugin's preferences as an associative array.
 
+There are various ways you can code the above requirements, depending on your plugin's exact needs. Some working examples:
 
-where @$abc_my_plugin@ is global.
+* "soo_required_files":http://ipsedixit.net/txp/101/soo_required_files-source-code, a public-side plugin
+* "soo_editarea":http://ipsedixit.net/txp/125/source-code, an admin-side plugin
+
 
 h3(#limitations). Limitations
 
