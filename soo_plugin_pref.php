@@ -1,7 +1,7 @@
 <?php
 
 $plugin['name'] = 'soo_plugin_pref';
-$plugin['version'] = '0.2.2';
+$plugin['version'] = '0.2.3';
 $plugin['author'] = 'Jeff Soo';
 $plugin['author_uri'] = 'http://ipsedixit.net/txp/';
 $plugin['description'] = 'Plugin preference manager';
@@ -170,7 +170,6 @@ h2. Contents
 * "Usage":#usage
 * "Info for plugin authors":#authors
 ** "Configuration":#config
-** "Functions":#functions
 ** "Limitations":#limitations
 * "History":#history
 
@@ -180,7 +179,7 @@ h2(#overview). Overview
 
 This is an admin-side plugin for managing plugin preferences. 
 
-For users, it provides a consistent admin interface to set preferences for *soo_plugin_pref*-compatible plugins, and automatically installs or removes those preferences from the database as appropriate. Of course, when you upgrade a plugin your existing preference values are retained. 
+For users, it provides a consistent admin interface to set preferences for *soo_plugin_pref*-compatible plugins, and automatically installs or removes those preferences from the database as appropriate. (When you upgrade a plugin your existing preference values are retained.)
 
 For plugin authors, it allows you to add preference settings to your plugins without having to create the user interface or the preference-handling functions.
 
@@ -191,6 +190,8 @@ h2(#usage). Usage
 *soo_plugin_pref* only works with plugins that are designed to use it. (See "support forum thread":http://forum.textpattern.com/viewtopic.php?id=31732 for a list of compatible plugins.) As of version 0.2.1, you can install plugins in any order. A compatible plugin's preferences will be installed the first time you "activate it or click its *Options* link in the plugin list":http://textbook.textpattern.net/wiki/index.php?title=Plugins#Panel_layout_.26_controls while *soo_plugin_pref* is active. Its preferences will be removed from the database when you delete it while *soo_plugin_pref* is active.
 
 To set a plugin's preferences, "click its *Options* link in the plugin list":http://textbook.textpattern.net/wiki/index.php?title=Plugins#Panel_layout_.26_controls.
+
+NB: A limitation is that if you upgrade an already-enabled plugin, and the new version of the plugin includes new pref settings, you must disable and re-enable it to pick up the changes.
 
 h2(#authors). Info for plugin authors
 
@@ -203,9 +204,9 @@ To configure a plugin to work with *soo_plugin_pref*:
 In the plugin manifest (i.e., the @$plugin@ array at the top of the file):
 
 * Ensure the plugin will load on the admin side (i.e., if @type@ is 0, change it to 1)
-* Set the plugin flags (using "http://textpattern.googlecode.com/svn/development/4.x-plugin-template/":http://textpattern.googlecode.com/svn/development/4.x-plugin-template/ all you need to do is uncomment the @$plugin['flags']@ line):
+* Set the plugin flags (the official plugin template at "https://github.com/textpattern/textpattern-plugin-template/blob/master/zem_plugin_example.php":https://github.com/textpattern/textpattern-plugin-template/blob/master/zem_plugin_example.php already does this for you)
 
-In the plugin code section (substituting your plugin's name for @abc_my_plugin@, and whatever name you choose for the callback function):
+Add this to the plugin code section (substituting your plugin's name for @abc_my_plugin@, and whatever name you choose for the callback function):
 
 pre. @require_plugin('soo_plugin_pref');	// optional
 if ( @txpinterface == 'admin' ) 
@@ -292,8 +293,13 @@ h3(#limitations). Limitations
 
 * Currently the only allowed values for @html@ are @text_input@ and @yesnoradio@.
 * *soo_plugin_pref* only handles global preferences. If your plugin has a mix of global and per-user preferences, you will have to code all the handling of the per-user preferences.
+* Preferences are only installed on enabling a plugin. Upgrading an enabled plugin does not trigger *soo_plugin_pref* to install any preferences new to the upgraded version. The user must disable and re-enable it to pick up the new prefs. Plugin authors should include a note about this when releasing a new version with new prefs.
 
 h2(#history). Version History
+
+h4. 0.2.3 (2017-02-23)
+
+Documentation update
 
 h3. 0.2.2 (9/28/2009)
 
